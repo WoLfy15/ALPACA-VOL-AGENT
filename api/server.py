@@ -180,6 +180,7 @@ def run(req: RunRequest = RunRequest()):
             enable_heston_cross_check=SETTINGS.enable_heston_cross_check,
             enable_toxicity_gate=SETTINGS.enable_toxicity_gate,
             enable_cost_floor=SETTINGS.enable_cost_floor,
+            enable_auto_exit=SETTINGS.enable_auto_exit,
         )
     try:
         result = run_cycle(settings)

@@ -180,6 +180,19 @@ class AlpacaClient:
                 return None
             raise
 
+    def close_position(self, symbol_or_id: str) -> Optional[dict]:
+        """Liquidate a single position at market via DELETE /v2/positions/{symbol}.
+        Alpaca fills this as a market sell-to-close for long positions or
+        buy-to-close for short positions. Returns the closing order dict,
+        or None if the position was already gone (404)."""
+        try:
+            return self._trading_request("DELETE", f"/v2/positions/{symbol_or_id}")
+        except AlpacaAPIError as exc:
+            if exc.status == 404:
+                log.warning("close_position: %s not found (already closed?)", symbol_or_id)
+                return None
+            raise
+
     # ------------------------------------------------------------------ orders
     def get_orders(self, status: str = "open", limit: int = 100) -> list[dict]:
         return self._trading_get("/v2/orders", params={"status": status, "limit": limit}) or []

@@ -72,6 +72,10 @@ class RiskLimits:
     kelly_fraction: float = field(default_factory=lambda: _float("KELLY_FRACTION", 0.25))
     kelly_clip: float = field(default_factory=lambda: _float("KELLY_CLIP", 0.15))
     max_contracts_per_leg: int = field(default_factory=lambda: _int("MAX_CONTRACTS_PER_LEG", 20))
+    # -- auto-exit thresholds (v2) --
+    exit_take_profit_pct: float = field(default_factory=lambda: _float("EXIT_TAKE_PROFIT_PCT", 0.50))
+    exit_stop_loss_pct: float = field(default_factory=lambda: _float("EXIT_STOP_LOSS_PCT", 0.35))
+    exit_dte_close_days: int = field(default_factory=lambda: _int("EXIT_DTE_CLOSE_DAYS", 1))
 
 
 @dataclass(frozen=True)
@@ -122,6 +126,7 @@ class Settings:
     enable_heston_cross_check: bool = field(default_factory=lambda: _bool("ENABLE_HESTON_CROSS_CHECK", True))
     enable_toxicity_gate: bool = field(default_factory=lambda: _bool("ENABLE_TOXICITY_GATE", True))
     enable_cost_floor: bool = field(default_factory=lambda: _bool("ENABLE_COST_FLOOR", True))
+    enable_auto_exit: bool = field(default_factory=lambda: _bool("ENABLE_AUTO_EXIT", True))
 
     # -- risk --
     risk: RiskLimits = field(default_factory=RiskLimits)

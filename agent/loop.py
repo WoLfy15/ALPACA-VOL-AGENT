@@ -52,6 +52,7 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 
+from agent.exits import ExitDecision, evaluate_exits
 from agent.state import compute_risk_metrics, load_state, record_decision, record_equity, save_state
 from alpaca_client import AlpacaClient
 from pricing_engine.calibration.iv_solver import IVSolverError
@@ -60,7 +61,7 @@ from config import Settings
 from data.market_data import (
     atm_implied_vol, daily_log_returns_from_bars, fetch_chain, implied_vol_for, to_option_quote,
 )
-from execution.order_manager import plan_equity_hedge, plan_iron_condor, plan_straddle_buy, submit_orders
+from execution.order_manager import plan_equity_hedge, plan_iron_condor, plan_position_close, plan_straddle_buy, submit_orders
 from pricing_engine.market_data.contract import OptionType
 from pricing_engine.risk.sas import strike_adjusted_spread
 from research.heston_signal import HestonCrossCheck, assess_heston_cross_check
@@ -124,6 +125,8 @@ class AgentRunResult:
     max_structure_loss: float = 0.0            # max risk budget for short-vol structure
     capped_by: list[str] = field(default_factory=list)  # which risk caps actually fired
     regime_size_scale: float = 1.0             # REGIME_SIZE_SCALE applied this cycle
+    # -- auto-exit decisions (v2) --
+    exit_decisions: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _bars_to_frame(bars: list[dict]) -> pd.DataFrame:
@@ -311,6 +314,30 @@ def run_cycle(settings: Settings, client: Optional[AlpacaClient] = None) -> Agen
         ) / 10_000.0
 
     planned_orders: list[dict[str, Any]] = []
+    exit_decisions_raw: list[ExitDecision] = []
+
+    # --- Auto-exit: evaluate open positions for stop-loss / take-profit / near-expiry ---
+    if settings.enable_auto_exit:
+        try:
+            raw_positions = client.get_positions()
+            exit_decisions_raw = evaluate_exits(raw_positions, settings.risk, settings.symbol)
+            for ed in exit_decisions_raw:
+                plan = plan_position_close(
+                    symbol=ed.symbol, qty=ed.qty, reason=ed.reason,
+                    pnl_pct=ed.pnl_pct, dte=ed.dte,
+                )
+                if plan:
+                    result_dict = submit_orders(client, plan, settings)
+                    planned_orders.append({"kind": plan.kind, "description": plan.description, **result_dict})
+                    notes.append(
+                        f"Auto-exit [{ed.reason.replace('_',' ').upper()}]: {ed.symbol} "
+                        f"qty={ed.qty:g} P&L={ed.pnl_pct:+.1%} DTE={ed.dte} "
+                        f"({'SUBMITTED' if not settings.dry_run else 'DRY RUN'})"
+                    )
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"Auto-exit evaluation failed: {type(exc).__name__}: {exc}")
+            log.warning("Auto-exit evaluation failed: %s", exc, exc_info=True)
+
     sizing = None
     if not kill_switch:
         straddle = build_straddle(chain, expiry, spot, risk_free_rate)
@@ -433,6 +460,13 @@ def run_cycle(settings: Settings, client: Optional[AlpacaClient] = None) -> Agen
         max_structure_loss=sizing.max_structure_loss if sizing else 0.0,
         capped_by=sizing.capped_by if sizing else [],
         regime_size_scale=REGIME_SIZE_SCALE.get(regime.current_label, 1.0),
+        exit_decisions=[
+            {"symbol": ed.symbol, "qty": ed.qty, "reason": ed.reason,
+             "pnl_pct": ed.pnl_pct, "dte": ed.dte,
+             "avg_entry_price": ed.avg_entry_price, "current_price": ed.current_price,
+             "market_value": ed.market_value}
+            for ed in exit_decisions_raw
+        ],
     )
 
     state.last_run_utc = result.timestamp_utc
