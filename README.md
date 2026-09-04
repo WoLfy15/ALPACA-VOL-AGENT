@@ -10,15 +10,74 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![Alpaca API](https://img.shields.io/badge/Alpaca-CLI-brightgreen.svg)](https://alpaca.markets/docs/)
+  [![Deployment](https://img.shields.io/badge/Vercel-Deployed-success.svg)](https://alpha-trading-deployment-lastcommit-dun.vercel.app/dashboard)
+
+  ### 🌐 **Live Web Application & Research Terminal**
+  **[https://alpha-trading-deployment-lastcommit-dun.vercel.app/dashboard](https://alpha-trading-deployment-lastcommit-dun.vercel.app/dashboard)**
 </div>
 
 ---
 
 ## ⚡ The Elevator Pitch
 
-**Alpaca Vol Agent** is an autonomous, quantitative options trading system that harvests volatility risk premium (VRP). It fuses a regime-conditional HMM, GARCH/HAR-RV forecasting, and Kelly sizing with rigorous transaction-cost-aware hedging—all executing seamlessly through Alpaca's official CLI. 
+**Alpaca Vol Agent** is an autonomous, quantitative options trading system that harvests volatility risk premium (VRP). It fuses a regime-conditional HMM, GARCH/HAR-RV volatility forecasting, and Kelly sizing with transaction-cost-aware hedging—all executing seamlessly through Alpaca's official CLI.
 
 This isn't just an LLM making random guesses. It's a mathematically grounded **Volatility-Harvesting Agent** combined with a **Portfolio Hedge Overlay**, representing the pinnacle of "Options Alpha" for this hackathon.
+
+---
+
+## 📸 Interactive Terminal Showcase
+
+Explore the live quantitative research terminal and execution system in action:
+
+<div align="center">
+  <h3>1. Complete Research Terminal Overview</h3>
+  <img src="assets/screenshots/01_terminal_overview.png" alt="Full Research Terminal Overview" width="95%">
+  <p><em>Full-page view of the VOL/AGENT Research Terminal displaying real-time market data, model signals, and execution status.</em></p>
+</div>
+
+<br>
+
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%">
+        <h4 align="center">2. Topbar Header & Portfolio KPIs</h4>
+        <img src="assets/screenshots/02_topbar_kpis.png" alt="Topbar & KPIs" width="100%">
+        <p align="center"><em>Real-time market clock, live status indicators, account equity ($100k), and buying power ($400k).</em></p>
+      </td>
+      <td width="50%">
+        <h4 align="center">3. Multi-Model Signal Decomposition</h4>
+        <img src="assets/screenshots/03_signal_decomposition.png" alt="Signal Decomposition" width="100%">
+        <p align="center"><em>VRP comparison (Forecast Vol 10.5% vs Live ATM IV 9.3%), z-score calculation (+2.26), and Long Vol composite edge.</em></p>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%">
+        <h4 align="center">4. Regime Detection & Risk Throttles</h4>
+        <img src="assets/screenshots/04_regime_risk_throttles.png" alt="Regime & Risk Throttles" width="100%">
+        <p align="center"><em>HMM Regime ('Trend'), Gamma Posture, VPIN Flow Toxicity, and dynamic size scaling multipliers.</em></p>
+      </td>
+      <td width="50%">
+        <h4 align="center">5. Interactive Backtest Sandbox</h4>
+        <img src="assets/screenshots/05_backtest_sandbox.png" alt="Backtest Sandbox" width="100%">
+        <p align="center"><em>On-demand historical backtesting with friction modeling (Sharpe Ratio, CAGR, Max Drawdown, Friction Paid).</em></p>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%">
+        <h4 align="center">6. Live Options Chain & Portfolio Greeks</h4>
+        <img src="assets/screenshots/06_options_chain_greeks.png" alt="Options Chain & Greeks" width="100%">
+        <p align="center"><em>Real-time SPY options chain matrix, DTE filters, and net aggregate Greek exposures (Delta, Gamma, Vega, Theta).</em></p>
+      </td>
+      <td width="50%">
+        <h4 align="center">7. Automated Decision Audit Trail</h4>
+        <img src="assets/screenshots/07_decision_audit_log.png" alt="Decision Audit Trail" width="100%">
+        <p align="center"><em>Fractional Kelly allocation (+15.00% / $15,000 budget), execution rationale, and order execution logs.</em></p>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 
@@ -28,11 +87,6 @@ This isn't just an LLM making random guesses. It's a mathematically grounded **V
 
 **The Solution:**
 Our agent reads real implied volatility directly off Alpaca's live chain, cross-validates it using an independent, purely historical signal (Zou-Derman Strike-Adjusted Spread), and executes fractional-Kelly sized Iron Condors or Straddles. Every trade is delta-hedged using a min-variance ratio with Whalley-Wilmott no-trade bands to prevent bleeding out to spread and slippage.
-
-<div align="center">
-  <img src="assets/dashboard.png" alt="Trading Dashboard" width="90%">
-  <p><em>Immersive Dashboard Tracking Live Option Chains & Model Decision Trails</em></p>
-</div>
 
 ---
 
