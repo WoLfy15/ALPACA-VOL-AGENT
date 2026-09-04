@@ -1,4 +1,4 @@
-﻿# Secrets — NEVER commit
+# Secrets — NEVER commit
 .env
 
 # Python
@@ -19,6 +19,12 @@ venv/
 .venv/
 env/
 ENV/
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
 
 # IDE
 .vscode/

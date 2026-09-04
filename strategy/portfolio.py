@@ -200,4 +200,4 @@ def vol_target_scale(realized_portfolio_vol: Optional[float], risk: RiskLimits) 
     estimate realized_portfolio_vol."""
     if not realized_portfolio_vol or realized_portfolio_vol <= 0:
         return 1.0
-    return min(risk.target_portfolio_vol / realized_portfolio_vol, 1.5)
+    return min(risk.target_portfolio_vol / realized_portfolio_vol, 1.2)

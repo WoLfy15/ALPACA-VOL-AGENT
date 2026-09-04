@@ -65,7 +65,7 @@ from pricing_engine.market_data.contract import MarketSmilePoint, OptionType
 FELLER_FRAGILE_BELOW = 1.0
 FELLER_ELEVATED_BELOW = 3.0
 
-VOL_OF_VOL_SIZE_MULTIPLIER = {"Stable": 1.0, "Elevated": 0.75, "Fragile": 0.5}
+VOL_OF_VOL_SIZE_MULTIPLIER = {"Stable": 1.0, "Elevated": 0.85, "Fragile": 0.65}
 
 # Data-quality gate: a fitted smile with a worse RMSE than this (vol
 # points), or built from too few strikes, is more likely to mislead than

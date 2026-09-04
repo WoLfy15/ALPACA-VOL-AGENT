@@ -120,8 +120,8 @@ def test_hedge_outside_band_trades_towards_target():
         risk_free_rate=0.04, params=HedgeParams(transaction_cost_bps=5, risk_aversion=1.0),
     )
     assert hd.should_trade is True
-    # Crash regime multiplier (1.5x) means we hedge MORE than 1:1 against the option delta.
-    assert hd.target_shares == pytest.approx(-1.5 * 500.0)
+    # Crash regime multiplier (1.3x) means we hedge MORE than 1:1 against the option delta.
+    assert hd.target_shares == pytest.approx(-1.3 * 500.0)
 
 
 def test_min_variance_hedge_ratio_falls_back_with_short_history():

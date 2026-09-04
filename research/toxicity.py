@@ -58,9 +58,9 @@ SIGMA_LOOKBACK_BUCKETS = 30
 MIN_SIGMA_FRACTION_OF_GLOBAL = 0.15  # floors the rolling sigma so a too-quiet lookback doesn't make BVC hypersensitive to tiny ticks
 
 # percentile-vs-own-history thresholds (see module docstring on VPIN's noise floor)
-ELEVATED_PERCENTILE = 0.85
+ELEVATED_PERCENTILE = 0.90
 TOXIC_PERCENTILE = 0.97
-REGIME_SIZE_MULTIPLIER = {"Normal": 1.0, "Elevated": 0.7, "Toxic": 0.4, "Unavailable": 1.0}
+REGIME_SIZE_MULTIPLIER = {"Normal": 1.0, "Elevated": 0.85, "Toxic": 0.60, "Unavailable": 1.0}
 # ADDITIONAL bps to widen an execution limit price by, on top of whatever
 # base buffer execution/order_manager.py already applies for normal
 # indicative-feed spread width -- 0 under normal flow (no extra

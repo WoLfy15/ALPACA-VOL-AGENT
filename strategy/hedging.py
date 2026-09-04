@@ -36,7 +36,7 @@ import numpy as np
 from config import HedgeParams
 from pricing_engine.risk.friction_hedging import whalley_wilmott_band
 
-REGIME_HEDGE_MULTIPLIER = {"Range": 1.2, "Trend": 0.6, "Vol_Expansion": 1.0, "Crash": 1.5}
+REGIME_HEDGE_MULTIPLIER = {"Range": 1.0, "Trend": 0.8, "Vol_Expansion": 1.1, "Crash": 1.3}
 
 
 @dataclass

@@ -60,7 +60,7 @@ from dataclasses import dataclass, field
 from config import RiskLimits
 
 REGIME_SIZE_SCALE = {
-    "Crash": 0.4, "Vol_Expansion": 0.4, "Trend": 0.7, "Range": 1.0,
+    "Crash": 0.55, "Vol_Expansion": 0.70, "Trend": 0.85, "Range": 1.0,
 }
 
 

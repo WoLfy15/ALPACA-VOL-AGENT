@@ -62,7 +62,7 @@ REGIME_GAMMA_MAP = {
 # no damping is v1's bug. Applied once regardless of how many of the
 # present legs disagree (multiplying per-pair would over-punish a 3-leg
 # read for the same single dissenting leg).
-DISAGREEMENT_DAMPING = 0.5
+DISAGREEMENT_DAMPING = 0.65
 
 
 @dataclass
@@ -118,7 +118,7 @@ def build_signal(
     realized_vol_history: "np.ndarray | list[float]",
     sas_values: Optional[list[float]] = None,
     sas_scale: float = 0.05,
-    vrp_weight: float = 0.6,
+    vrp_weight: float = 0.70,
     heston_term_gap: Optional[float] = None,
     heston_confident: bool = True,
     heston_scale: float = 0.05,
@@ -193,7 +193,7 @@ def build_signal(
     if disagreement:
         blended *= DISAGREEMENT_DAMPING
 
-    composite_edge = math.tanh(0.6 * blended)
+    composite_edge = math.tanh(0.85 * blended)
 
     gamma_regime = REGIME_GAMMA_MAP.get(regime_label, "NEUTRAL")
     if regime_label == "Vol_Expansion" and vrp_raw <= 0:
