@@ -61,7 +61,7 @@ from config import Settings
 from data.market_data import (
     atm_implied_vol, daily_log_returns_from_bars, fetch_chain, implied_vol_for, to_option_quote,
 )
-from execution.order_manager import plan_equity_hedge, plan_iron_condor, plan_position_close, plan_straddle_buy, submit_orders
+from execution.order_manager import plan_equity_hedge, plan_iron_condor, plan_position_close, plan_straddle_buy, submit_close_position, submit_orders
 from pricing_engine.market_data.contract import OptionType
 from pricing_engine.risk.sas import strike_adjusted_spread
 from research.heston_signal import HestonCrossCheck, assess_heston_cross_check
@@ -322,18 +322,24 @@ def run_cycle(settings: Settings, client: Optional[AlpacaClient] = None) -> Agen
             raw_positions = client.get_positions()
             exit_decisions_raw = evaluate_exits(raw_positions, settings.risk, settings.symbol)
             for ed in exit_decisions_raw:
-                plan = plan_position_close(
-                    symbol=ed.symbol, qty=ed.qty, reason=ed.reason,
-                    pnl_pct=ed.pnl_pct, dte=ed.dte,
+                # Use DELETE /v2/positions/{symbol} — Alpaca's preferred close method.
+                # This avoids the HTTP 403 "no available quote" error that market orders
+                # hit when an option has no live bid (illiquid / near-expiry).
+                result_dict = submit_close_position(client, ed.symbol, settings, ed.reason)
+                desc = (
+                    f"[{ed.reason.replace('_',' ').upper()}] CLOSE {ed.qty:g}x {ed.symbol} "
+                    f"(P&L {ed.pnl_pct:+.1%}, {ed.dte} DTE)"
                 )
-                if plan:
-                    result_dict = submit_orders(client, plan, settings)
-                    planned_orders.append({"kind": plan.kind, "description": plan.description, **result_dict})
-                    notes.append(
-                        f"Auto-exit [{ed.reason.replace('_',' ').upper()}]: {ed.symbol} "
-                        f"qty={ed.qty:g} P&L={ed.pnl_pct:+.1%} DTE={ed.dte} "
-                        f"({'SUBMITTED' if not settings.dry_run else 'DRY RUN'})"
-                    )
+                planned_orders.append({
+                    "kind": f"exit_{ed.reason}",
+                    "description": desc,
+                    **result_dict,
+                })
+                notes.append(
+                    f"Auto-exit [{ed.reason.replace('_',' ').upper()}]: {ed.symbol} "
+                    f"qty={ed.qty:g} P&L={ed.pnl_pct:+.1%} DTE={ed.dte} "
+                    f"({'SUBMITTED' if not settings.dry_run else 'DRY RUN'})"
+                )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"Auto-exit evaluation failed: {type(exc).__name__}: {exc}")
             log.warning("Auto-exit evaluation failed: %s", exc, exc_info=True)

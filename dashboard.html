@@ -191,6 +191,11 @@ svg.echart{width:100%;height:170px;display:block;overflow:visible}
 .log-time{font-family:var(--mono);color:var(--faint);font-size:10.5px}
 .log-dir{font-family:var(--mono);font-weight:600;font-size:10.5px;letter-spacing:0.03em}
 .log-meta{color:var(--dim);font-family:var(--mono);font-size:11px}
+.scroll-panel{max-height:340px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.scroll-panel::-webkit-scrollbar{width:4px}
+.scroll-panel::-webkit-scrollbar-track{background:transparent}
+.scroll-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.scroll-panel::-webkit-scrollbar-thumb:hover{background:var(--dim)}
 
 /* orders */
 .order-item{border:1px solid var(--border);background:var(--inset);padding:9px 11px;margin-bottom:8px;font-size:11.5px}
@@ -254,6 +259,24 @@ table.chain tbody tr:hover{background:var(--inset)}
 
 footer{text-align:center;padding:26px 0 10px;color:var(--faint);font-size:11px;font-family:var(--mono)}
 footer a{color:var(--dim)}
+
+/* multi-symbol strip */
+.sym-strip{display:flex;flex-wrap:wrap;gap:6px;padding:10px 20px;background:var(--panel-2);border-bottom:1px solid var(--border)}
+.sym-pill{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:0.03em;padding:4px 10px;border:1px solid var(--border);background:var(--inset);cursor:pointer;color:var(--dim);transition:all 0.15s}
+.sym-pill:hover{border-color:var(--orange);color:var(--text)}
+.sym-pill.active{border-color:var(--orange);color:var(--orange);background:var(--orange-lo)}
+.sym-pill.long{border-left:3px solid var(--green)}
+.sym-pill.short{border-left:3px solid var(--red)}
+.sym-pill.flat{border-left:3px solid var(--faint)}
+.sym-pill.err{border-left:3px solid var(--red);opacity:0.5}
+.sym-pill .sym-edge{font-size:9px;margin-left:4px;opacity:0.7}
+.run-all-btn{font-family:var(--sans);font-size:11px;font-weight:600;background:transparent;color:var(--orange);border:1px solid var(--orange);padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.run-all-btn:hover{background:var(--orange-lo)}
+.run-all-btn:disabled{opacity:0.5;cursor:default}
+.cancel-btn{font-family:var(--sans);font-size:11px;font-weight:600;background:transparent;color:var(--red);border:1px solid var(--red);padding:5px 10px;cursor:pointer;white-space:nowrap;transition:background 0.15s}
+.cancel-btn:hover{background:var(--red-lo)}
+.multi-summary{padding:8px 20px;background:var(--panel);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--dim);display:none;gap:16px;flex-wrap:wrap}
+.multi-summary b{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -272,10 +295,23 @@ footer a{color:var(--dim)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Run cycle
     </button>
+    <button class="cancel-btn" id="cancel-btn" onclick="cancelRun()" style="display:none">
+      ✕ Cancel
+    </button>
+    <button class="run-all-btn" id="run-all-btn" onclick="runAllAgent()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/><line x1="21" y1="3" x2="21" y2="21"/></svg>
+      Run All
+    </button>
+    <button class="cancel-btn" id="cancel-all-btn" onclick="cancelRunAll()" style="display:none">
+      ✕ Cancel
+    </button>
   </div>
 </div>
 
 <div class="wrap">
+
+  <div class="multi-summary" id="multi-summary"></div>
+  <div class="sym-strip" id="sym-strip" style="display:none"></div>
 
   <div class="kpi-strip" id="kpi-strip">
     <div class="kpi"><div class="kpi-label">Equity</div><div class="kpi-value" id="k-equity">—</div><div class="kpi-sub" id="k-equity-sub">—</div></div>
@@ -330,7 +366,7 @@ footer a{color:var(--dim)}
         <div class="panel-head">
           <div class="panel-title">Decision Log</div>
         </div>
-        <div class="panel-body pad-0" id="decisions-list">
+        <div class="panel-body pad-0 scroll-panel" id="decisions-list">
           <div class="empty">No decisions yet — run a cycle first.</div>
         </div>
       </div>
@@ -644,25 +680,137 @@ function filterChain(type, el){
 }
 
 // ================================================================ run agent
+// Active AbortControllers so the user can cancel in-flight runs
+var _runAbort = null;
+var _runAllAbort = null;
+
+function cancelRun() {
+  if (_runAbort) { _runAbort.abort(); }
+}
+function cancelRunAll() {
+  if (_runAllAbort) { _runAllAbort.abort(); }
+}
+
 async function runAgent(){
   const btn = $('run-btn');
+  const cancelBtn = $('cancel-btn');
+  _runAbort = new AbortController();
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div> Running…';
+  cancelBtn.style.display = 'inline-flex';
   try{
     const symbol = $('symbol-input').value.trim().toUpperCase() || undefined;
-    const res = await fetch(API+'/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(symbol?{symbol:symbol}:{})});
+    const res = await fetch(API+'/run', {
+      method:'POST',
+      signal: _runAbort.signal,
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(symbol ? {symbol:symbol} : {})
+    });
     if (!res.ok){ const err = await res.json().catch(function(){return {};}); throw new Error(err.detail || ('HTTP ' + res.status)); }
     const r = await res.json();
-    // Persist last run result so panels survive a page refresh
     try { localStorage.setItem('vol_agent_last_run', JSON.stringify(r)); } catch(e2){}
     displayRunResult(r);
     await loadStatus();
-  }catch(e){
-    alert('Agent run failed: '+e.message);
-  }finally{
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('Agent run failed: ' + e.message);
+  } finally {
+    _runAbort = null;
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run cycle';
+    cancelBtn.style.display = 'none';
   }
+}
+
+var _multiResults = null;
+
+async function runAllAgent(){
+  const btn = $('run-all-btn');
+  const cancelBtn = $('cancel-all-btn');
+  _runAllAbort = new AbortController();
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Scanning…';
+  cancelBtn.style.display = 'inline-flex';
+  try {
+    var res = await fetch(API+'/run-all', {
+      method:'POST',
+      signal: _runAllAbort.signal,
+      headers:{'Content-Type':'application/json'},
+      body: '{}'
+    });
+    if (!res.ok){ var err = await res.json().catch(function(){return {};}); throw new Error(err.detail || ('HTTP ' + res.status)); }
+    var data = await res.json();
+    _multiResults = data;
+    try { localStorage.setItem('vol_agent_multi_run', JSON.stringify(data)); } catch(e2){}
+    renderMultiResults(data);
+    await loadStatus();
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('Run-all failed: ' + e.message);
+  } finally {
+    _runAllAbort = null;
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/><line x1="21" y1="3" x2="21" y2="21"/></svg> Run All';
+    cancelBtn.style.display = 'none';
+  }
+}
+
+function renderMultiResults(data) {
+  var results = data.results || [];
+  var errors = data.errors || [];
+  var summary = data.summary || {};
+
+  // Show summary bar
+  var ms = $('multi-summary');
+  ms.style.display = 'flex';
+  ms.innerHTML =
+    '<span>Scanned <b>' + summary.total_symbols + '</b> symbols</span>' +
+    '<span>✓ <b>' + summary.succeeded + '</b> ok</span>' +
+    (summary.failed > 0 ? '<span style="color:var(--red)">✗ <b>' + summary.failed + '</b> failed</span>' : '') +
+    '<span style="color:var(--green)">LONG <b>' + summary.long_vol + '</b></span>' +
+    '<span style="color:var(--red)">SHORT <b>' + summary.short_vol + '</b></span>' +
+    '<span>FLAT <b>' + summary.flat + '</b></span>' +
+    '<span>Exits <b>' + summary.total_exits + '</b></span>' +
+    '<span>Orders <b>' + summary.total_orders + '</b></span>';
+
+  // Build symbol strip
+  var strip = $('sym-strip');
+  strip.style.display = 'flex';
+  var pills = '';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var dir = r.direction || 'flat';
+    var dirCls = dir === 'long_vol' ? 'long' : dir === 'short_vol' ? 'short' : 'flat';
+    var edge = r.composite_edge;
+    var edgeStr = edge != null ? (edge >= 0 ? '+' : '') + (edge * 100).toFixed(1) + '%' : '';
+    pills += '<span class="sym-pill ' + dirCls + '" data-idx="' + i + '" onclick="selectMultiSymbol(' + i + ')">' +
+      r.symbol + '<span class="sym-edge">' + edgeStr + '</span></span>';
+  }
+  for (var j = 0; j < errors.length; j++) {
+    pills += '<span class="sym-pill err" title="' + (errors[j].error || '').replace(/"/g, "'") + '">' + errors[j].symbol + ' ✗</span>';
+  }
+  strip.innerHTML = pills;
+
+  // Auto-select first result
+  if (results.length > 0) {
+    selectMultiSymbol(0);
+  }
+}
+
+function selectMultiSymbol(idx) {
+  if (!_multiResults || !_multiResults.results || !_multiResults.results[idx]) return;
+  var r = _multiResults.results[idx];
+
+  // Highlight active pill
+  var pills = document.querySelectorAll('.sym-pill');
+  for (var i = 0; i < pills.length; i++) {
+    pills[i].classList.remove('active');
+    if (pills[i].getAttribute('data-idx') == idx) pills[i].classList.add('active');
+  }
+
+  // Update symbol input
+  $('symbol-input').value = r.symbol;
+
+  // Display this symbol's result in all panels
+  displayRunResult(r);
 }
 
 function legRow(name, agreeState, detailHtml){
@@ -809,26 +957,50 @@ function displayRunResult(r){
 
   // -------- exit decisions
   var exits = r.exit_decisions || [];
-  $('exits-panel').style.display = exits.length ? 'block' : 'none';
-  $('exits-tag').textContent = exits.length ? (exits.length + ' trigger' + (exits.length > 1 ? 's' : '')) : 'none';
+  var exitOrders = r.planned_orders || [];
+  // Build a lookup: symbol -> order result (submitted/skipped/dry)
+  var exitOrderMap = {};
+  exitOrders.forEach(function(o){
+    if ((o.kind||'').startsWith('exit_')) {
+      // key by the symbol in the description e.g. "[NEAR EXPIRY] CLOSE 1x AAPL260904…"
+      var m = (o.description||'').match(/CLOSE [0-9]+x (\S+)/);
+      if (m) exitOrderMap[m[1]] = o;
+    }
+  });
+
+  // Always show exits panel after a run
+  $('exits-panel').style.display = 'block';
+  $('exits-tag').textContent = exits.length ? (exits.length + ' trigger' + (exits.length > 1 ? 's' : '')) : 'none this cycle';
   if (exits.length) {
     $('exits-body').innerHTML = exits.map(function(ex){
       var reasonCls = (ex.reason || '').replace(/_/g, '-');
       var reasonLabel = (ex.reason || '').replace(/_/g, ' ').toUpperCase();
       var pnlColor = ex.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
-      var shortSym = ex.symbol.length > 20 ? ex.symbol.substring(0, 6) + '…' + ex.symbol.substring(ex.symbol.length - 10) : ex.symbol;
+      var shortSym = ex.symbol.length > 20 ? ex.symbol.substring(0, 6) + '\u2026' + ex.symbol.substring(ex.symbol.length - 10) : ex.symbol;
+
+      // Sell execution status badge
+      var ord = exitOrderMap[ex.symbol];
+      var statusBadge = '';
+      if (!ord) statusBadge = '';
+      else if (ord.dry_run) statusBadge = '<span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border:1px solid var(--border);color:var(--amber);margin-left:8px">DRY RUN</span>';
+      else if (ord.skipped) statusBadge = '<span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border:1px solid var(--border);color:var(--dim);margin-left:8px" title="' + (ord.skip_reason||'') + '">SKIP — no quote</span>';
+      else if (ord.submitted) statusBadge = '<span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border:1px solid rgba(74,222,128,0.4);color:var(--green);background:var(--green-lo);margin-left:8px">✓ SOLD</span>';
+
       return '<div class="exit-item">' +
         '<span class="exit-reason ' + reasonCls + '">' + reasonLabel + '</span>' +
-        '<span style="font-family:var(--mono);font-size:11px">' + shortSym + '</span>' +
+        statusBadge +
+        '<span style="font-family:var(--mono);font-size:11px;margin-left:8px">' + shortSym + '</span>' +
         '<div class="exit-detail">' +
           '<span>qty <b>' + fmt(ex.qty, 0) + '</b></span>' +
-          '<span>P&L <b style="color:' + pnlColor + '">' + fmtSigned(ex.pnl_pct) + '</b></span>' +
+          '<span>P&amp;L <b style="color:' + pnlColor + '">' + fmtSigned(ex.pnl_pct) + '</b></span>' +
           '<span>DTE <b>' + ex.dte + '</b></span>' +
           '<span>entry <b>$' + fmt(ex.avg_entry_price, 2) + '</b></span>' +
           '<span>now <b>$' + fmt(ex.current_price, 2) + '</b></span>' +
         '</div>' +
       '</div>';
     }).join('');
+  } else {
+    $('exits-body').innerHTML = '<div class="empty">No exit triggers this cycle — all positions within thresholds.</div>';
   }
 }
 
@@ -875,6 +1047,10 @@ async function runBacktest(){
   try {
     const raw = localStorage.getItem('vol_agent_last_run');
     if (raw) { const r = JSON.parse(raw); if (r && r.symbol) displayRunResult(r); }
+  } catch(e) {}
+  try {
+    const raw = localStorage.getItem('vol_agent_multi_run');
+    if (raw) { const data = JSON.parse(raw); if (data && data.results) { _multiResults = data; renderMultiResults(data); } }
   } catch(e) {}
 })();
 

@@ -59,6 +59,15 @@ def _int(name: str, default: int) -> int:
     return int(val) if val not in (None, "") else default
 
 
+DEFAULT_WATCHLIST = "NVDA,AAPL,TSLA,MSFT,AMZN,GOOGL,META,NFLX,AVGO,AMD,BRK.B,JPM,V,LLY,WMT,COST"
+
+
+def _list(name: str, default: str) -> list[str]:
+    val = os.getenv(name)
+    raw = val if val not in (None, "") else default
+    return [s.strip().upper() for s in raw.split(",") if s.strip()]
+
+
 @dataclass(frozen=True)
 class RiskLimits:
     """Portfolio-overlay risk budget. All fractions are of current
@@ -102,6 +111,7 @@ class Settings:
 
     # -- what to trade --
     symbol: str = field(default_factory=lambda: os.getenv("SYMBOL", "SPY"))
+    watchlist: list = field(default_factory=lambda: _list("WATCHLIST", DEFAULT_WATCHLIST))
     target_dte_days: int = field(default_factory=lambda: _int("TARGET_DTE_DAYS", 7))
     dte_tolerance_days: int = field(default_factory=lambda: _int("DTE_TOLERANCE_DAYS", 3))
     short_leg_target_delta: float = field(default_factory=lambda: _float("SHORT_LEG_TARGET_DELTA", 0.16))

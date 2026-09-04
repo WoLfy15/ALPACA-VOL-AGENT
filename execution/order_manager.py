@@ -23,9 +23,12 @@ normal book.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any, Optional
+
+log = logging.getLogger("alpaca_vol_agent.order_manager")
 
 from alpaca_client import AlpacaClient
 from config import Settings
@@ -169,9 +172,21 @@ def submit_orders(client: AlpacaClient, plan: PlannedOrder, settings: Settings) 
 
 
 def submit_close_position(client: AlpacaClient, symbol: str, settings: Settings, reason: str) -> dict[str, Any]:
-    """Alternative close path using Alpaca's DELETE /v2/positions/{symbol}
-    instead of building a sell order. Simpler but still gated by dry_run."""
+    """Close a position via DELETE /v2/positions/{symbol}. If Alpaca rejects
+    with 403 'no available quote' (illiquid / expired option), the position
+    is already effectively worthless -- we record it as skipped rather than
+    crashing the whole cycle. dry_run gate still applies."""
     if settings.dry_run:
         return {"submitted": False, "dry_run": True, "close_symbol": symbol, "reason": reason}
-    result = client.close_position(symbol)
-    return {"submitted": True, "dry_run": False, "close_result": result, "reason": reason}
+    try:
+        result = client.close_position(symbol)
+        return {"submitted": True, "dry_run": False, "close_result": result, "reason": reason}
+    except Exception as exc:
+        err_str = str(exc)
+        # 403 'no available quote' means the option has no bid -- it is
+        # effectively worthless (expired or deeply OTM). Log and skip.
+        if "40310000" in err_str or "no available quote" in err_str:
+            log.warning("close_position %s: no quote (likely worthless) -- skipping close: %s", symbol, exc)
+            return {"submitted": False, "dry_run": False, "skipped": True,
+                    "reason": reason, "skip_reason": "no_quote_worthless"}
+        raise
